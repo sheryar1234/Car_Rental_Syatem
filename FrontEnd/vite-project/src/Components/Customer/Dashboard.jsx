@@ -191,7 +191,7 @@ const Dashboard = () => {
               <div className="p-4">
                 <div className="mb-2 flex justify-between">
                   <p className="text-slate-800 text-xl font-semibold">{vehicle.name}</p>
-                  <p className="text-cyan-600 text-xl font-semibold">${vehicle.rentPrice}</p>
+                  <p className="text-cyan-600 text-xl font-semibold">Rs {vehicle.rentPrice}</p>
                 </div>
                 <p className="text-gray-400">{vehicle.location}</p>
                 <p className="text-slate-600 leading-normal line-clamp-3 h-20 py-1 font-light">{vehicle.description}</p>
