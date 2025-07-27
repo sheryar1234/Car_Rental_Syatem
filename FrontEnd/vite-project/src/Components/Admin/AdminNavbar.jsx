@@ -80,12 +80,20 @@ const AdminNavbar = () => {
         Renters
       </Link>
       <Link
-        to="/calendar"
+        to="/customer-reports"
         className={`rounded-md px-3 py-2 text-sm font-medium ${
-          location.pathname === '/calendar' ? 'bg-gray-900 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white'
+          location.pathname === '/customer-reports' ? 'bg-gray-900 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white'
         }`}
       >
-        Calendar
+       Customer Reports
+      </Link>
+      <Link
+        to="/renter-reports"
+        className={`rounded-md px-3 py-2 text-sm font-medium ${
+          location.pathname === '/renter-reports' ? 'bg-gray-900 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white'
+        }`}
+      >
+       Renter Reports
       </Link>
     </div>
               </div>

@@ -201,11 +201,7 @@ const AdminDashboard = () => {
                 >
                   Read More →
                 </button>
-                <button
-                  className="w-full mt-3 bg-gray-800 text-white py-2 rounded-lg border border-transparent text-center text-sm transition-all shadow-md hover:shadow-lg  focus:shadow-none active:bg-cyan-700 hover:bg-cyan-700 active:shadow-none disabled:pointer-events-none disabled:opacity-50 disabled:shadow-none"
-                >
-                  Reserve Now
-                </button>
+               
               </div>
             </div>
           ))}

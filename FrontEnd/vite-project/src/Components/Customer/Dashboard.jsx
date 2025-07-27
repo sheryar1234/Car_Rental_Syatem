@@ -1,10 +1,14 @@
 import React, { useEffect, useState, useRef } from "react";
 import Navbar from "../Navbar";
-
+import { carNames, cities } from "./CityandCarData";
 import axios from "axios";
+import VehiclePopup from "./VehiclePopup";
+import FilterPopup from "./FilterPopup";
+import ReservePopup from "./ReservePopup";
 
 const Dashboard = () => {
   const [vehicles, setVehicles] = useState([]);
+  const [filteredVehicles, setFilteredVehicles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedVehicle, setSelectedVehicle] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
@@ -13,10 +17,28 @@ const Dashboard = () => {
   const [applyFilters, setApplyFilters] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [noResults, setNoResults] = useState(false);
+  const [showReservePopup, setShowReservePopup] = useState(false);
+  const [formData, setFormData] = useState({
+    fromDate: "",
+    toDate: "",
+    vehicleName: "",
+    carImage: null,
+    licenseImage: null,
+    idCardImage: null,
+    paymentReceipt: null,
+  });
+  const [totalCost, setTotalCost] = useState(0);
+  const [driverRating, setDriverRating] = useState(0);
+  const [notification, setNotification] = useState({
+    show: false,
+    message: "",
+    type: "" // 'success' or 'error'
+  });
 
   const menuRef = useRef(null);
   const popupRef = useRef(null);
-  // Fetch vehicles when filters or searchTerm change
+
+  // Fetch vehicles and driver rating
   useEffect(() => {
     const fetchVehicles = async () => {
       setLoading(true);
@@ -36,11 +58,15 @@ const Dashboard = () => {
         }
 
         const response = await axios.get(url);
-        if (response.data.length === 0) {
+        const availableVehicles = response.data.filter(vehicle => 
+          vehicle.status === "Available"
+        );
+        
+        setVehicles(availableVehicles);
+        
+        if (availableVehicles.length === 0) {
           setNoResults(true);
         }
-
-        setVehicles(response.data);
       } catch (error) {
         console.error("Error fetching vehicles:", error);
         setNoResults(true);
@@ -49,9 +75,39 @@ const Dashboard = () => {
       }
     };
 
+    const fetchDriverRating = async () => {
+      const userEmail = localStorage.getItem("userEmail");
+      if (!userEmail) return;
+
+      try {
+        const response = await axios.get(`http://localhost:5000/api/average?driverEmail=${userEmail}`);
+        setDriverRating(response.data.averageRating || 0);
+      } catch (error) {
+        console.error("Error fetching driver rating:", error);
+      }
+    };
+
     fetchVehicles();
+    fetchDriverRating();
   }, [searchTerm, filters]);
 
+  // Filter vehicles based on driver rating
+  useEffect(() => {
+    if (vehicles.length > 0) {
+      const filtered = vehicles.filter(vehicle => 
+        driverRating >= vehicle.minDriverRating
+      );
+      setFilteredVehicles(filtered);
+      setNoResults(filtered.length === 0);
+    }
+  }, [vehicles, driverRating]);
+
+  // Check if the Reserve Now button should be disabled
+  const isReserveDisabled = (vehicle) => {
+    return vehicle.status !== "Available" || driverRating < vehicle.minDriverRating;
+  };
+
+  // Handle filter changes
   const handleApplyFilters = () => {
     setFilters(tempFilters);
     setShowFilters(false);
@@ -67,6 +123,7 @@ const Dashboard = () => {
     setTempFilters({ ...tempFilters, [e.target.name]: e.target.value });
   };
 
+  // Handle clicking outside the popup
   const handleClickOutside = (event) => {
     if (
       popupRef.current &&
@@ -84,9 +141,92 @@ const Dashboard = () => {
     };
   }, []);
 
+  // Handle reservation submission
+  const handleReserveSubmit = async (formData) => {
+    const userEmail = localStorage.getItem("userEmail");
+
+    if (!userEmail) {
+      showNotification("User is not authenticated. Please log in.", "error");
+      return;
+    }
+
+    const data = new FormData();
+    data.append("fromDate", formData.fromDate);
+    data.append("toDate", formData.toDate);
+    data.append("licenseImage", formData.licenseImage);
+    data.append("idCardImage", formData.idCardImage);
+    data.append("paymentReceipt", formData.paymentReceipt);
+    data.append("carImage", selectedVehicle.carImage);
+    data.append("vehicleId", selectedVehicle._id);
+    data.append("vehicleName", selectedVehicle.name);
+    data.append("totalCost", totalCost);
+    data.append("userEmail", userEmail);
+    data.append("renterEmail", selectedVehicle.email);
+
+    try {
+      await axios.post("http://localhost:5000/api/bookings", data, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+      showNotification("Booking successful!", "success");
+      setShowReservePopup(false);
+      
+      // Refresh the vehicle list
+      const response = await axios.get("http://localhost:5000/api/vehicles/all");
+      const availableVehicles = response.data.filter(vehicle => 
+        vehicle.status === "Available"
+      );
+      setVehicles(availableVehicles);
+    } catch (error) {
+      console.error("Error booking vehicle:", error);
+      showNotification("Booking failed. Please try again.", "error");
+    }
+  };
+
+  // Show notification function
+  const showNotification = (message, type) => {
+    setNotification({
+      show: true,
+      message,
+      type
+    });
+    
+    setTimeout(() => {
+      setNotification(prev => ({...prev, show: false}));
+    }, 5000);
+  };
+
   return (
-    <div >
+    <div className="relative">
       <Navbar />
+      
+      {/* Notification */}
+      <div className={`fixed top-0 left-0 right-0 z-50 flex justify-center transition-all duration-500 ease-out ${
+        notification.show ? "translate-y-0" : "-translate-y-full"
+      }`}>
+        {notification.show && (
+          <div className={`mt-4 px-6 py-4 rounded-lg shadow-lg ${
+            notification.type === "success" 
+              ? "bg-green-100 border-green-400 text-green-700" 
+              : "bg-red-100 border-red-400 text-red-700"
+          } border-l-4`}>
+            <div className="flex items-center">
+              {notification.type === "success" ? (
+                <svg className="w-6 h-6 mr-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                </svg>
+              ) : (
+                <svg className="w-6 h-6 mr-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              )}
+              <span className="font-semibold">{notification.message}</span>
+            </div>
+          </div>
+        )}
+      </div>
+
       <label
         className="mx-auto mt-10 relative bg-white min-w-sm max-w-2xl flex flex-col md:flex-row items-center justify-center border py-2 px-2 rounded-2xl gap-2 shadow-2xl focus-within:border-gray-300"
         htmlFor="search-bar"
@@ -97,7 +237,14 @@ const Dashboard = () => {
           className="px-6 py-2 w-full rounded-xl flex-1 outline-none bg-white"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
+          list="car-options"
         />
+        <datalist id="car-options">
+          {carNames.map((car) => (
+            <option key={car} value={car} />
+          ))}
+        </datalist>
+
         <svg
           onClick={() => setShowFilters(!showFilters)}
           xmlns="http://www.w3.org/2000/svg"
@@ -121,47 +268,14 @@ const Dashboard = () => {
         </button>
       </label>
 
-      {/* Filter Modal */}
       {showFilters && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-96 shadow-lg relative">
-            <button
-              className="absolute top-2 right-2 text-gray-500 text-2xl hover:text-black z-10"
-              onClick={handleCloseFilters}
-            >
-              ✕
-            </button>
-            <h2 className="text-xl font-semibold text-gray-800 mb-4">Filter Options</h2>
-            <div className="mb-4">
-              <label className="block text-gray-700 font-medium mb-2">Location:</label>
-              <input
-                type="text"
-                name="location"
-                value={tempFilters.location}
-                onChange={handleFilterChange}
-                className="w-full p-2 border rounded-lg"
-                placeholder="Enter location"
-              />
-            </div>
-            <div className="mb-4">
-              <label className="block text-gray-700 font-medium mb-2">Max Rent Price:</label>
-              <input
-                type="number"
-                name="maxPrice"
-                value={tempFilters.maxPrice}
-                onChange={handleFilterChange}
-                className="w-full p-2 border rounded-lg"
-                placeholder="Enter max price"
-              />
-            </div>
-            <button
-              onClick={handleApplyFilters}
-              className="w-full bg-gray-800 text-white py-2 rounded-lg hover:bg-gray-700"
-            >
-              Apply Filters
-            </button>
-          </div>
-        </div>
+        <FilterPopup
+          tempFilters={tempFilters}
+          handleFilterChange={handleFilterChange}
+          handleApplyFilters={handleApplyFilters}
+          handleCloseFilters={handleCloseFilters}
+          cities={cities}
+        />
       )}
 
       <h1 ref={popupRef} className="text-center mt-10 text-3xl font-bold underline">Recommended</h1>
@@ -172,11 +286,15 @@ const Dashboard = () => {
         </div>
       ) : noResults ? (
         <div className="flex justify-center mt-20">
-          <h1 className="text-3xl font-bold text-red-600">No vehicle found</h1>
+          <h1 className="text-3xl font-bold text-red-600">
+            {filteredVehicles.length === 0 && vehicles.length > 0 
+              ? "No vehicles match your driver rating" 
+              : "No available vehicles found"}
+          </h1>
         </div>
       ) : (
         <div className="flex flex-wrap justify-center gap-6 my-10">
-          {vehicles.map((vehicle) => (
+          {filteredVehicles.map((vehicle) => (
             <div
               key={vehicle._id}
               className="relative flex flex-col bg-white shadow-sm border border-slate-200 rounded-lg w-96"
@@ -193,7 +311,11 @@ const Dashboard = () => {
                   <p className="text-slate-800 text-xl font-semibold">{vehicle.name}</p>
                   <p className="text-cyan-600 text-xl font-semibold">Rs {vehicle.rentPrice}</p>
                 </div>
-                <p className="text-gray-400">{vehicle.location}</p>
+                <div className="flex">
+                  <p className="text-gray-400 ">{vehicle.location}</p>
+                  <p className="text-green-600 ml-auto font-semibold">Available</p>
+                </div>
+               
                 <p className="text-slate-600 leading-normal line-clamp-3 h-20 py-1 font-light">{vehicle.description}</p>
                 <button
                   className="text-cyan-600 text-sm hover:underline"
@@ -202,7 +324,16 @@ const Dashboard = () => {
                   Read More →
                 </button>
                 <button
-                  className="w-full mt-3 bg-gray-800 text-white py-2 rounded-lg border border-transparent text-center text-sm transition-all shadow-md hover:shadow-lg  focus:shadow-none active:bg-cyan-700 hover:bg-cyan-700 active:shadow-none disabled:pointer-events-none disabled:opacity-50 disabled:shadow-none"
+                  className={`w-full mt-3 bg-gray-800 text-white py-2 rounded-lg border border-transparent text-center text-sm transition-all shadow-md hover:shadow-lg focus:shadow-none active:bg-cyan-700 hover:bg-cyan-700 active:shadow-none ${
+                    isReserveDisabled(vehicle) ? "opacity-50 cursor-not-allowed" : ""
+                  }`}
+                  onClick={() => {
+                    if (!isReserveDisabled(vehicle)) {
+                      setSelectedVehicle(vehicle);
+                      setShowReservePopup(true);
+                    }
+                  }}
+                  disabled={isReserveDisabled(vehicle)}
                 >
                   Reserve Now
                 </button>
@@ -212,33 +343,26 @@ const Dashboard = () => {
         </div>
       )}
 
-{selectedVehicle && (
-        <div
-       
-          className="fixed inset-0  bg-black bg-opacity-50 flex items-center justify-center z-50"
-        >
-          <div  ref={popupRef}  className="overflow-y-auto bg-white rounded-lg pt-6 pr-7 pl-6 w-3/4 md:w-2/5 shadow-lg relative ">
-            <button
-              className="absolute top-2 right-2 text-gray-500 text-2xl hover:text-black z-10"
-              onClick={() => setSelectedVehicle(null)}
-            >
-              ✕
-            </button>
-            <img
-              src={selectedVehicle.carImage}
-              alt={selectedVehicle.name}
-              className="w-full h-60 object-cover rounded-lg mb-4"
-            />
-            <h2 className="text-xl font-semibold text-gray-800">{selectedVehicle.name}</h2>
-            <div className=" max-h-60 mt-4">
-              <p className="text-gray-600">{selectedVehicle.description}</p>
-            </div>
-          </div>
-        </div>
+      {selectedVehicle && (
+        <VehiclePopup
+          vehicle={selectedVehicle}
+          onClose={() => setSelectedVehicle(null)}
+        />
+      )}
+
+      {showReservePopup && (
+        <ReservePopup
+          vehicle={selectedVehicle}
+          onClose={() => setShowReservePopup(false)}
+          onSubmit={handleReserveSubmit}
+          formData={formData}
+          setFormData={setFormData}
+          totalCost={totalCost}
+          setTotalCost={setTotalCost}
+        />
       )}
     </div>
   );
 };
-
 
 export default Dashboard;

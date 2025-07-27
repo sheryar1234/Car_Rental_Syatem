@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
+import { Link } from "react-router-dom";
 
 const RenterNavbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -11,9 +12,16 @@ const RenterNavbar = () => {
     make: '',
     model: '',
     name: '',
-    location:'',
+    location: '',
     rentPrice: '',
     description: '',
+    status: 'Available',
+    minDriverRating: 0,
+  });
+  const [notification, setNotification] = useState({
+    show: false,
+    message: '',
+    type: '' // 'success' or 'error'
   });
   const menuRef = useRef(null);
   const profileMenuRef = useRef(null);
@@ -21,6 +29,19 @@ const RenterNavbar = () => {
   const toggleMenu = () => setIsMenuOpen((prev) => !prev);
   const togglePopup = () => setIsPopupOpen((prev) => !prev);
   const toggleProfileMenu = () => setIsProfileMenuOpen((prev) => !prev);
+
+  // Show notification function
+  const showNotification = (message, type) => {
+    setNotification({
+      show: true,
+      message,
+      type
+    });
+    
+    setTimeout(() => {
+      setNotification(prev => ({...prev, show: false}));
+    }, 5000);
+  };
 
   const handleClickOutside = (event) => {
     if (menuRef.current && !menuRef.current.contains(event.target)) {
@@ -51,17 +72,30 @@ const RenterNavbar = () => {
     form.append('location', formData.location);
     form.append('rentPrice', formData.rentPrice);
     form.append('description', formData.description);
+    form.append('status', formData.status);
+    form.append('minDriverRating', formData.minDriverRating);
 
     try {
       const response = await axios.post('http://localhost:5000/api/vehicles/add', form, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
-      alert(response.data.message);
-      setIsPopupOpen(false); // Close the popup
-      setFormData({ email:'',carImage: null, make: '', model: '', name: '',location:'', rentPrice: '', description: '' }); // Reset form
+      showNotification(response.data.message || 'Vehicle added successfully', 'success');
+      setIsPopupOpen(false);
+      setFormData({ 
+        email: localStorage.getItem('userEmail') || '', 
+        carImage: null, 
+        make: '', 
+        model: '', 
+        name: '', 
+        location: '', 
+        rentPrice: '', 
+        description: '', 
+        status: 'Available', 
+        minDriverRating: 0 
+      });
     } catch (error) {
       console.error(error.response?.data?.message || 'Error adding vehicle');
-      alert(error.response?.data?.message || 'Error adding vehicle');
+      showNotification(error.response?.data?.message || 'Error adding vehicle', 'error');
     }
   };
 
@@ -71,7 +105,31 @@ const RenterNavbar = () => {
   }, []);
 
   return (
-    <div>
+    <div className="relative">
+      {/* Notification */}
+      <div className={`fixed top-0 left-0 right-0 z-50 flex justify-center transition-all duration-500 ease-out ${
+        notification.show ? "translate-y-0" : "-translate-y-full"
+      }`}>
+        {notification.show && (
+          <div className={`mt-4 px-6 py-4 rounded-lg shadow-lg flex items-center ${
+            notification.type === "success" 
+              ? "bg-emerald-100 border-emerald-400 text-emerald-800" 
+              : "bg-rose-100 border-rose-400 text-rose-800"
+          } border-l-4`}>
+            {notification.type === "success" ? (
+              <svg className="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+              </svg>
+            ) : (
+              <svg className="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            )}
+            <span className="font-medium">{notification.message}</span>
+          </div>
+        )}
+      </div>
+
       <nav className="bg-gray-800">
         <div className="mx-auto max-w-7xl px-2 sm:px-6 lg:px-8">
           <div className="relative flex h-20 items-center justify-between">
@@ -82,18 +140,21 @@ const RenterNavbar = () => {
               </div>
               <div className="hidden sm:ml-6 sm:block">
                 <div className="flex space-x-4">
-                  <a href="#" className="rounded-md bg-gray-900 px-3 py-2 text-sm font-medium text-white">
+                  <Link to="/renterDashboard" className="rounded-md px-3 py-2 text-sm font-medium text-white bg-gray-900">
                     Dashboard
-                  </a>
-                  <a href="#" className="rounded-md px-3 py-2 text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white">
-                    Team
-                  </a>
-                  <a href="#" className="rounded-md px-3 py-2 text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white">
-                    Projects
-                  </a>
-                  <a href="#" className="rounded-md px-3 py-2 text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white">
-                    Calendar
-                  </a>
+                  </Link>
+                  <Link to="/bookingRequests" className="rounded-md px-3 py-2 text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white">
+                    Booking Requests
+                  </Link>
+                  <Link to="/confirmedBookings" className="rounded-md px-3 py-2 text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white">
+                    Confirmed Bookings
+                  </Link>
+                  <Link to="/recievedBookings" className="rounded-md px-3 py-2 text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white">
+                    Recieved Bookings
+                  </Link>
+                  <Link to="/renter-report" className="rounded-md px-3 py-2 text-sm font-medium text-gray-300 hover:bg-gray-700 hover:text-white">
+                    Report an Issue
+                  </Link>
                 </div>
               </div>
             </div>
@@ -182,6 +243,7 @@ const RenterNavbar = () => {
                   name="carImage"
                   onChange={handleFileChange}
                   className="mt-1 pt-2 pb-2 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                  required
                 />
               </div>
               <div>
@@ -193,6 +255,7 @@ const RenterNavbar = () => {
                   onChange={handleInputChange}
                   placeholder="Car Make"
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                  required
                 />
               </div>
               <div>
@@ -204,6 +267,7 @@ const RenterNavbar = () => {
                   onChange={handleInputChange}
                   placeholder="Car Model"
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                  required
                 />
               </div>
               <div>
@@ -215,6 +279,7 @@ const RenterNavbar = () => {
                   onChange={handleInputChange}
                   placeholder="Name"
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                  required
                 />
               </div>
               <div>
@@ -226,18 +291,19 @@ const RenterNavbar = () => {
                   onChange={handleInputChange}
                   placeholder="Location"
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                  required
                 />
               </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700">Rent Price</label>
                 <input
-                  type="text"
+                  type="number"
                   name="rentPrice"
                   value={formData.rentPrice}
                   onChange={handleInputChange}
                   placeholder="Rent Price"
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                  required
                 />
               </div>
               <div>
@@ -248,7 +314,38 @@ const RenterNavbar = () => {
                   onChange={handleInputChange}
                   placeholder="Enter Description"
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                  required
                 />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Status</label>
+                <select
+                  name="status"
+                  value={formData.status}
+                  onChange={handleInputChange}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                >
+                  <option value="Available">Available</option>
+                  <option value="Reserved">Reserved</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Minimum Driver Rating</label>
+                <div className="flex items-center mt-1">
+                  {[1, 2, 3, 4, 5].map((value) => (
+                    <svg
+                      key={value}
+                      className={`w-6 h-6 cursor-pointer ${
+                        formData.minDriverRating >= value ? "text-yellow-400" : "text-gray-300"
+                      }`}
+                      fill="currentColor"
+                      viewBox="0 0 22 20"
+                      onClick={() => handleInputChange({ target: { name: "minDriverRating", value } })}
+                    >
+                      <path d="M20.924 7.625a1.523 1.523 0 0 0-1.238-1.044l-5.051-.734-2.259-4.577a1.534 1.534 0 0 0-2.752 0L7.365 5.847l-5.051.734A1.535 1.535 0 0 0 1.463 9.2l3.656 3.563-.863 5.031a1.532 1.532 0 0 0 2.226 1.616L11 17.033l4.518 2.375a1.534 1.534 0 0 0 2.226-1.617l-.863-5.03L20.537 9.2a1.523 1.523 0 0 0 .387-1.575Z" />
+                    </svg>
+                  ))}
+                </div>
               </div>
               <button
                 type="submit"

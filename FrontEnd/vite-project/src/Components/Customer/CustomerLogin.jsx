@@ -16,7 +16,7 @@ const CustomerLogin = () => {
 
       // Store the JWT token in localStorage or cookies for authentication
       localStorage.setItem('token', response.data.token);
-
+      localStorage.setItem('userEmail', email);
       // Redirect user to the dashboard or any other page
       navigate('/customerDashboard');
     } catch (err) {
